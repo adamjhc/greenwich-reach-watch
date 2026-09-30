@@ -163,7 +163,14 @@ function renderTier() {
     html += `<p class="facts">No ${ship ? 'departure' : 'arrival'} is in the PLA forecast yet. Forecasts usually appear a few days ahead.</p>`;
   }
 
-  if (tier.error) html += `<p class="error">Showing the last good copy: ${esc(tier.error)}</p>`;
+  // A single refused refresh is retried within a minute, so only mention it
+  // once the copy on screen is getting old.
+  const age = tier.updatedAt ? Date.now() - Date.parse(tier.updatedAt) : 0;
+  if (tier.error && age > 15 * 60 * 1000) {
+    html += `<p class="error">The Port of London ship list hasn't responded since ${esc(
+      when(tier.updatedAt),
+    )}, so this may be out of date. It's retried every minute while the page is open.</p>`;
+  }
   body.innerHTML = html;
 }
 

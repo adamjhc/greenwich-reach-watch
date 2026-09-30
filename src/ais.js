@@ -1,10 +1,10 @@
 // Live vessel positions from aisstream.io (free, needs an API key). Their
-// WebSocket refuses browser connections, so the server holds the socket and
-// keeps an in-memory picture of every vessel inside the bounding box.
+// WebSocket refuses browser connections, so the Durable Object holds the
+// socket and keeps an in-memory picture of every vessel inside the box.
 
-const URL = 'wss://stream.aisstream.io/v0/stream';
-const STALE_AFTER = 30 * 60 * 1000; // drop vessels not heard from in 30 min
-const QUIET_AFTER = 10 * 60 * 1000; // reconnect if the stream goes silent
+const STREAM_URL = 'https://stream.aisstream.io/v0/stream';
+export const STALE_AFTER = 30 * 60 * 1000; // drop vessels not heard from in 30 min
+const QUIET_AFTER = 10 * 60 * 1000; // treat a silent stream as dead
 
 const MESSAGE_TYPES = [
   'PositionReport',
@@ -16,17 +16,13 @@ const MESSAGE_TYPES = [
 
 const clean = (s) => (typeof s === 'string' ? s.replace(/@+$/, '').trim() || null : null);
 
-export function startAis({ apiKey, bbox, onChange }) {
+export function createAis({ apiKey, bbox, onChange }) {
   const vessels = new Map();
-  const status = { state: apiKey ? 'connecting' : 'disabled', error: null, lastMessageAt: null };
-  let socket;
-  let retryDelay = 2000;
+  const status = { state: apiKey ? 'stopped' : 'disabled', error: null, lastMessageAt: null };
+  let socket = null;
   let lastActivity = 0;
 
-  if (!apiKey) {
-    status.error = 'AISSTREAM_API_KEY is not set';
-    return { vessels, status };
-  }
+  if (!apiKey) status.error = 'AISSTREAM_API_KEY is not set';
 
   function vessel(mmsi) {
     if (!vessels.has(mmsi)) vessels.set(mmsi, { mmsi });
@@ -96,28 +92,40 @@ export function startAis({ apiKey, bbox, onChange }) {
     onChange?.();
   }
 
-  function connect() {
+  async function connect() {
     status.state = 'connecting';
     let received = false;
-    socket = new WebSocket(URL);
-    socket.binaryType = 'arraybuffer';
+    try {
+      // Workers open outbound WebSockets with an Upgrade fetch.
+      const res = await fetch(STREAM_URL, { headers: { Upgrade: 'websocket' } });
+      if (!res.webSocket) throw new Error(`aisstream refused the connection (HTTP ${res.status})`);
+      socket = res.webSocket;
+      socket.accept();
+    } catch (err) {
+      status.state = 'reconnecting';
+      status.error = err.message;
+      return;
+    }
 
-    socket.addEventListener('open', () => {
-      socket.send(
-        JSON.stringify({
-          APIKey: apiKey,
-          BoundingBoxes: [[[bbox.south, bbox.west], [bbox.north, bbox.east]]],
-          FilterMessageTypes: MESSAGE_TYPES,
-        }),
-      );
-      status.state = 'connected';
-      status.error = null;
-      retryDelay = 2000;
-      lastActivity = Date.now();
-    });
+    const ws = socket;
+    ws.send(
+      JSON.stringify({
+        APIKey: apiKey,
+        BoundingBoxes: [[[bbox.south, bbox.west], [bbox.north, bbox.east]]],
+        FilterMessageTypes: MESSAGE_TYPES,
+      }),
+    );
+    status.state = 'connected';
+    lastActivity = Date.now();
 
-    socket.addEventListener('message', (event) => {
-      const raw = typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data);
+    ws.addEventListener('message', async (event) => {
+      const { data } = event;
+      const raw =
+        typeof data === 'string'
+          ? data
+          : data instanceof Blob
+            ? await data.text()
+            : new TextDecoder().decode(new Uint8Array(data));
       let msg;
       try {
         msg = JSON.parse(raw);
@@ -125,6 +133,7 @@ export function startAis({ apiKey, bbox, onChange }) {
         return;
       }
       received = true;
+      status.error = null;
       status.lastMessageAt = lastActivity = Date.now();
       if (msg.error) {
         status.error = msg.error;
@@ -133,35 +142,54 @@ export function startAis({ apiKey, bbox, onChange }) {
       handle(msg);
     });
 
-    socket.addEventListener('error', (event) => {
-      status.error = event.message || 'WebSocket error';
-    });
-
-    socket.addEventListener('close', (event) => {
+    ws.addEventListener('close', (event) => {
+      if (socket !== ws) return;
+      socket = null;
       // aisstream drops the socket without a reason when the key is bad.
       if (!received) {
         status.error = `aisstream closed the connection (code ${event.code}) before sending data. Check AISSTREAM_API_KEY.`;
       }
-      status.state = 'reconnecting';
-      setTimeout(connect, retryDelay);
-      retryDelay = Math.min(retryDelay * 2, 60000);
+      if (status.state !== 'stopped') status.state = 'reconnecting';
+    });
+
+    ws.addEventListener('error', () => {
+      status.error = status.error ?? 'aisstream WebSocket error';
     });
   }
 
-  setInterval(() => {
-    const now = Date.now();
-    let removed = false;
-    for (const [mmsi, v] of vessels) {
-      if (now - v.lastSeen > STALE_AFTER) removed = vessels.delete(mmsi);
-    }
-    if (removed) onChange?.();
+  return {
+    vessels,
+    status,
 
-    if (status.state === 'connected' && now - lastActivity > QUIET_AFTER) {
-      lastActivity = now;
-      socket.close();
-    }
-  }, 60 * 1000).unref();
+    // Called on start and from the Durable Object's alarm: connects if needed,
+    // reconnects a dead or silent stream and drops stale vessels.
+    async tick() {
+      if (!apiKey) return;
+      const now = Date.now();
+      let removed = false;
+      for (const [mmsi, v] of vessels) {
+        if (now - v.lastSeen > STALE_AFTER) removed = vessels.delete(mmsi);
+      }
+      if (removed) onChange?.();
 
-  connect();
-  return { vessels, status };
+      if (socket && now - lastActivity > QUIET_AFTER) {
+        socket.close(1000, 'Stream went quiet');
+        socket = null;
+      }
+      if (!socket) await connect();
+    },
+
+    stop() {
+      if (!apiKey) return;
+      status.state = 'stopped';
+      const ws = socket;
+      socket = null;
+      ws?.close(1000, 'No viewers');
+    },
+
+    restore(list) {
+      const cutoff = Date.now() - STALE_AFTER;
+      for (const v of list) if (v.lastSeen > cutoff) vessels.set(v.mmsi, v);
+    },
+  };
 }

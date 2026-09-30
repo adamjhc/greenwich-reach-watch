@@ -3,16 +3,16 @@
 A live map of boats on the Thames around Deptford (SE8) and Greenwich, plus
 what's moored at **Greenwich Ship Tier** and when it next moves.
 
-## Run it
+## Run it locally
 
-Needs Node 22.9 or newer. There are no npm dependencies.
+Needs Node 22 or newer. The app runs on Cloudflare Workers, and Wrangler
+simulates Workers on your machine.
 
 ```sh
+npm install
 cp .env.example .env   # then paste your aisstream.io key into it
-npm start              # http://localhost:3000
+npm run dev            # http://localhost:8787
 ```
-
-Use `npm run dev` to restart on file changes.
 
 Without an API key the site still runs. It shows the Greenwich Tier status
 and leaves the map empty.
@@ -22,6 +22,18 @@ and leaves the map empty.
 1. Go to <https://aisstream.io> and sign in (GitHub login works).
 2. Open **API Keys** and create a key.
 3. Put it in `.env` as `AISSTREAM_API_KEY=...`.
+
+## Deploy to Cloudflare
+
+This fits in the Workers free plan.
+
+```sh
+npx wrangler login
+npx wrangler secret put AISSTREAM_API_KEY
+npm run deploy
+```
+
+`npm run tail` streams the live logs.
 
 ## Data sources
 
@@ -55,30 +67,40 @@ the year and treats times as UK local time (`Europe/London`).
 ## How it fits together
 
 ```
-aisstream.io ──WebSocket──┐
-                          ├─► server.js ──SSE /api/stream──► browser (MapLibre map + panel)
-PLA ship list ──HTTP/5min─┘
+aisstream.io ──WebSocket (only while someone is viewing)──┐
+                                                          ├─► River Durable Object ──SSE /api/stream──► browser
+PLA ship list ──HTTP, at most every 5 min─────────────────┘
 ```
 
-- `lib/pla.js` scrapes and parses the PLA lists and builds the Greenwich Tier status.
-- `lib/ais.js` handles the aisstream connection, keeps vessel state in memory, and
-  drops vessels not heard from in 30 minutes.
-- `server.js` serves static files and three endpoints: `/api/tier`,
-  `/api/vessels` and `/api/stream` (SSE).
+- `src/worker.js` is the Worker entry point. Workers Static Assets serves
+  `public/`, and the Worker only handles `/api/stream`, `/api/tier` and
+  `/api/vessels`.
+- `src/river.js` holds the `River` Durable Object. A single instance holds
+  the aisstream connection, the vessel state and the cached Tier status, and
+  relays updates to every open page. It connects to aisstream when the first
+  viewer arrives and disconnects 10 minutes after the last one leaves, so it
+  uses little of the free plan's Durable Object allowance. That allowance is
+  shared with any other Durable Objects on the account. The last known
+  vessels and Tier status are saved to the object's storage, so a returning
+  viewer sees boats straight away.
+- `src/ais.js` is the aisstream client and vessel tracking. It drops vessels
+  not heard from in 30 minutes.
+- `src/pla.js` scrapes and parses the PLA lists and builds the Greenwich Tier
+  status.
 - `public/` is the front end, with no build step.
 
 ## Configuration
 
-| Variable | Default | Meaning |
+| Setting | Where | Meaning |
 | --- | --- | --- |
-| `AISSTREAM_API_KEY` | none | Required for live positions |
-| `PORT` | `3000` | HTTP port |
-| `BBOX` | `51.468,-0.060,51.512,0.020` | Area to watch: `south,west,north,east`. The default covers Rotherhithe to the O2. |
+| `AISSTREAM_API_KEY` | `.env` locally, `wrangler secret put` in production | Required for live positions |
+| `BBOX` | `vars` in `wrangler.jsonc` | Area to watch: `south,west,north,east`. The default `51.468,-0.060,51.512,0.020` covers Rotherhithe to the O2. |
 
 ## Caveats
 
-- The map fills in gradually. Moving boats report every few seconds, but
-  moored ones report only every 3 to 6 minutes.
+- After a quiet spell, the map fills in gradually. Moving boats report every
+  few seconds, but moored ones report only every 3 to 6 minutes. Boat types
+  arrive only every 6 minutes.
 - Small craft without AIS won't appear.
 - The Greenwich Tier marker sits at plus code `9C3XFXMM+HP` (51.4839, -0.0157).
 - A ship at the tier is highlighted on the map when its AIS name matches the

@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "greenwich-reach-watch",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./public"
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "RIVER", "class_name": "River" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["River"] }],
+  "vars": {
+    // Area to watch: south,west,north,east
+    "BBOX": "51.468,-0.060,51.512,0.020"
+  },
+  "secrets": {
+    "required": ["AISSTREAM_API_KEY"]
+  },
+  "observability": {
+    "enabled": true
+  }
+}

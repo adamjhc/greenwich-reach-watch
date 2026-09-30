@@ -64,11 +64,21 @@ function parseBerthed(value) {
   return fromLondon(2000 + y, mo, d, h, min);
 }
 
-async function fetchList(flag) {
+const RETRYABLE = new Set([403, 429, 500, 502, 503, 504]);
+const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// The PLA site sits behind its own bot protection, which occasionally
+// refuses a request from Cloudflare's network and accepts the next one.
+async function fetchList(flag, attempt = 1) {
   const res = await fetch(`${BASE}?flag=${flag}`, {
     headers: { 'user-agent': 'greenwich-reach-watch (personal river dashboard)' },
     signal: AbortSignal.timeout(15000),
   });
+  if (RETRYABLE.has(res.status) && attempt === 1) {
+    await res.body?.cancel();
+    await pause(3000);
+    return fetchList(flag, attempt + 1);
+  }
   if (!res.ok) throw new Error(`PLA list ${flag} returned HTTP ${res.status}`);
   return rows(await res.text());
 }
@@ -88,9 +98,10 @@ function toMovement(type, [date, time, at, vessel, agent, flag, from, to, note])
 }
 
 export async function fetchGreenwichTier() {
-  const [inPort, arrivals, departures, movements] = await Promise.all(
-    Object.values(LISTS).map(fetchList),
-  );
+  // One at a time: a burst of parallel requests is what rate limiters notice.
+  const lists = [];
+  for (const flag of Object.values(LISTS)) lists.push(await fetchList(flag));
+  const [inPort, arrivals, departures, movements] = lists;
 
   const current = inPort
     .filter(([location, vessel]) => vessel && TIER.test(location))
