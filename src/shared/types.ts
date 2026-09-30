@@ -58,6 +58,7 @@ interface TierEvent {
   readonly at: string;
   readonly agent: string;
   readonly flag: string;
+  // Place names where the PLA gave a UN/LOCODE, otherwise the PLA's own berth name.
   readonly from: string;
   readonly to: string;
   readonly note: string | null;

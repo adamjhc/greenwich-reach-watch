@@ -15,7 +15,7 @@
     "denyWarnings": true,
     "reportUnusedDisableDirectives": "error"
   },
-  "ignorePatterns": ["dist", "worker-configuration.d.ts"],
+  "ignorePatterns": ["dist", "worker-configuration.d.ts", "src/server/ports.ts"],
   "rules": {
     "eslint/func-style": ["error", "declaration"],
     "eslint/one-var": ["error", "never"],
@@ -72,6 +72,11 @@
       // Workers and Vite both require a default export from these files.
       "files": ["src/server/worker.ts", "vite.config.ts"],
       "rules": { "import/no-default-export": "off" }
+    },
+    {
+      // Build scripts run in Node, as ES modules that nothing requires.
+      "files": ["scripts/**"],
+      "rules": { "import/no-nodejs-modules": "off", "node/no-top-level-await": "off" }
     }
   ]
 }

@@ -4,9 +4,13 @@
 
 import type { Berth, TierData, TierEvent } from '#shared/types.ts';
 
+import { PORTS } from './ports.ts';
+
 const BASE = 'https://shiplist.pla.co.uk/shiplist.cfm';
-const LISTS = { inPort: 4, arrivals: 5, departures: 6, movements: 7 } as const;
+const LISTS = { departed: 3, inPort: 4, arrivals: 5, departures: 6, movements: 7 } as const;
 const TIER = /GREENWICH TIER/iv;
+// How early a move can happen and still count as the forecast one.
+const EARLY = 12 * 3600 * 1000;
 
 type Row = readonly string[];
 
@@ -146,6 +150,11 @@ function toForecast([
   return { date, time, at, vessel, agent, flag, from, to, note };
 }
 
+// "GBLOW" becomes "Lowestoft". Anything else is a berth name, like "TILBURY DOCK".
+function placeName(code: string): string {
+  return PORTS[code] ?? code;
+}
+
 function toMovement(
   type: TierEvent['type'],
   { date, time, at, vessel, agent, flag, from, to, note }: Forecast,
@@ -157,8 +166,8 @@ function toMovement(
     at,
     agent,
     flag,
-    from,
-    to,
+    from: placeName(from),
+    to: placeName(to),
     note: note || null,
   };
 }
@@ -167,21 +176,54 @@ function toBerth([location = '', vessel = '', ref = '', flag = '', berthed = '']
   return { vessel, ref, flag, berthedAt: parseBerthed(berthed)?.toISOString() ?? null, location };
 }
 
+// A row of the "departures in the last 24 hours" list.
+interface Departure {
+  readonly vessel: string;
+  readonly from: string;
+  readonly at: number;
+}
+
+// "30/09 15:10", Vessel, Ref, Nationality, From, To
+function toDeparture(row: Row): Departure | null {
+  const [time = '', vessel = ''] = row;
+  const from = row[4] ?? '';
+  const [date = '', clockTime = ''] = time.split(' ');
+  const at = parseForecastTime(date, clockTime);
+  return at === null ? null : { vessel, from, at: at.getTime() };
+}
+
+// The forecast lists keep a move until someone tidies them, often hours after
+// it happened, so check it against where the ship actually is.
+function happened(e: TierEvent, departed: readonly Departure[], inPort: readonly Berth[]): boolean {
+  if (e.time === null) {
+    return false;
+  }
+  const earliest = Date.parse(e.time) - EARLY;
+  const berthedSince = inPort.some(
+    (b) =>
+      b.vessel === e.vessel &&
+      b.berthedAt !== null &&
+      Date.parse(b.berthedAt) >= earliest &&
+      // An arrival is done once the ship is at the tier; a departure once it's
+      // somewhere else in the port.
+      TIER.test(b.location) === (e.type === 'arrival'),
+  );
+  const leftTier =
+    e.type === 'departure' && departed.some((d) => d.vessel === e.vessel && TIER.test(d.from) && d.at >= earliest);
+  return berthedSince || leftTier;
+}
+
 async function fetchForecast(flag: number): Promise<Forecast[]> {
   const list = await fetchList(flag);
   return list.map((row) => toForecast(row));
 }
 
-async function fetchGreenwichTier(): Promise<TierData> {
-  // One at a time: a burst of parallel requests is what rate limiters notice.
-  const inPort = await fetchList(LISTS.inPort);
+// Forecast moves to or from the tier, soonest first.
+async function fetchTierForecast(): Promise<TierEvent[]> {
   const arrivals = await fetchForecast(LISTS.arrivals);
   const departures = await fetchForecast(LISTS.departures);
   const movements = await fetchForecast(LISTS.movements);
-
-  const current = inPort.map((row) => toBerth(row)).filter((b) => b.vessel !== '' && TIER.test(b.location));
-
-  const events = [
+  return [
     ...arrivals.filter((f) => TIER.test(f.to)).map((f) => toMovement('arrival', f)),
     ...departures.filter((f) => TIER.test(f.from)).map((f) => toMovement('departure', f)),
     // Shifts within the port: to or from the tier.
@@ -189,6 +231,18 @@ async function fetchGreenwichTier(): Promise<TierData> {
       .filter((f) => TIER.test(f.from) || TIER.test(f.to))
       .map((f) => toMovement(TIER.test(f.to) ? 'arrival' : 'departure', f)),
   ].toSorted((a, b) => (a.time ?? '').localeCompare(b.time ?? ''));
+}
+
+async function fetchGreenwichTier(): Promise<TierData> {
+  // One at a time: a burst of parallel requests is what rate limiters notice.
+  const inPort = await fetchList(LISTS.inPort);
+  const departed = await fetchList(LISTS.departed);
+  const forecast = await fetchTierForecast();
+
+  const berths = inPort.map((row) => toBerth(row)).filter((b) => b.vessel !== '');
+  const current = berths.filter((b) => TIER.test(b.location));
+  const left = departed.map((row) => toDeparture(row)).filter((d) => d !== null);
+  const events = forecast.filter((e) => !happened(e, left, berths));
 
   // The forecast keeps past-due entries until the movement is logged, so
   // treat anything from the last few hours as still "next".

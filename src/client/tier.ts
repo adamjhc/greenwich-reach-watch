@@ -80,14 +80,16 @@ function nextWhen(next: TimedEvent, isShip: boolean, ms: number): string {
     const verb = next.type === 'departure' ? 'Leaves' : 'Arrives';
     return `${isShip ? verb : 'Next'} in ${duration(ms)}`;
   }
-  const due = next.type === 'departure' ? 'Due to leave' : 'Due to arrive';
-  return `${isShip ? due : 'Next move'} now`;
+  const late = next.type === 'departure' ? 'Departure' : 'Arrival';
+  return `${isShip ? late : 'Next move'} overdue`;
 }
 
 function nextHtml(next: TierEvent | null, ship: Berth | undefined): string {
   const time = next?.time ?? null;
   if (time === null || next === null) {
-    return `<p class="facts">No ${ship ? 'departure' : 'arrival'} is in the PLA forecast yet. Forecasts usually appear a few days ahead.</p>`;
+    return `<div class="next"><p class="next-when">Nothing scheduled</p><p class="facts">No ${
+      ship ? 'departure' : 'arrival'
+    } is in the PLA forecast yet. Moves usually appear a few days ahead.</p></div>`;
   }
   const timed = { ...next, time };
   const ms = Date.parse(timed.time) - Date.now();

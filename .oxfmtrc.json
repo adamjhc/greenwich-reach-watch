@@ -4,5 +4,5 @@
   "singleQuote": true,
   "sortImports": true,
   "sortPackageJson": true,
-  "ignorePatterns": ["worker-configuration.d.ts", "dist", "package-lock.json"]
+  "ignorePatterns": ["worker-configuration.d.ts", "src/server/ports.ts", "dist", "package-lock.json"]
 }

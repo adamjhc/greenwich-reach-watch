@@ -1,47 +1,6 @@
 const TZ = 'Europe/London';
 const DAY = 864e5;
 
-const PLACES: Readonly<Record<string, string>> = {
-  GBDVR: 'Dover',
-  GBLON: 'London',
-  GBSOU: 'Southampton',
-  GBPME: 'Portsmouth',
-  GBHRW: 'Harwich',
-  GBTIL: 'Tilbury',
-  GBPLY: 'Plymouth',
-  GBFAL: 'Falmouth',
-  GBLIV: 'Liverpool',
-  GBNCL: 'Newcastle',
-  GBLEI: 'Leith',
-  GBINV: 'Invergordon',
-  GBGRK: 'Greenock',
-  GBIPS: 'Ipswich',
-  GBSHE: 'Sheerness',
-  NLAMS: 'Amsterdam',
-  NLRTM: 'Rotterdam',
-  NLIJM: 'IJmuiden',
-  NLMOE: 'Moerdijk',
-  BEZEE: 'Zeebrugge',
-  BEANR: 'Antwerp',
-  FRLEH: 'Le Havre',
-  FRCER: 'Cherbourg',
-  FRHON: 'Honfleur',
-  FRDKK: 'Dunkirk',
-  FRSML: 'Saint-Malo',
-  DEHAM: 'Hamburg',
-  DEBRV: 'Bremerhaven',
-  DEKEL: 'Kiel',
-  DKCPH: 'Copenhagen',
-  NOOSL: 'Oslo',
-  NOBGO: 'Bergen',
-  SEGOT: 'Gothenburg',
-  SESTO: 'Stockholm',
-  IEDUB: 'Dublin',
-  ESBIO: 'Bilbao',
-  PTLIS: 'Lisbon',
-  ISREY: 'Reykjavík',
-};
-
 const ESCAPES: Readonly<Record<string, string>> = {
   '&': '&amp;',
   '<': '&lt;',
@@ -63,8 +22,10 @@ function normaliseName(s: string): string {
   return s.toUpperCase().replaceAll(/[^A-Z0-9]/gv, '');
 }
 
-function place(code: string): string {
-  return PLACES[code] ?? (/^[A-Z]{5}$/v.test(code) ? code : titleCase(code));
+// The server has already named the ports it knows. PLA berth names come in
+// capitals; an unknown port code reads best left as it is.
+function place(name: string): string {
+  return name === name.toUpperCase() && !/^[A-Z]{2}[A-Z2-9]{3}$/v.test(name) ? titleCase(name) : name;
 }
 
 function capitalise(s: string): string {
