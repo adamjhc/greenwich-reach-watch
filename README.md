@@ -36,6 +36,10 @@ npm run deploy
 
 `npm run tail` streams the live logs.
 
+Pushes to `main` also deploy through GitHub Actions once the checks and build
+pass. The workflow needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as
+repository secrets.
+
 ## Data sources
 
 All of these are free. I checked each one before choosing it.
