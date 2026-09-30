@@ -273,7 +273,14 @@ function shape({ cat, moving, rotation = 0, size = 18 }) {
     <circle r="6.5" style="fill:${fill};stroke:${stroke}" stroke-width="1.5"/></svg>`;
 }
 
+// Moving boats report every few seconds and moored ones every 3–6 minutes,
+// so anything quieter than this is showing an old position.
+const STALE_MOVING = 2 * 60 * 1000;
+const STALE_STILL = 10 * 60 * 1000;
+const isStale = (v) => Date.now() - v.lastSeen > (v.sog >= 0.5 ? STALE_MOVING : STALE_STILL);
+
 function describe(v) {
+  if (isStale(v)) return `Last heard ${ago(v.lastSeen)}`;
   if (v.sog >= 0.5) return `${v.sog.toFixed(1)} knots`;
   return NAV_STATUS[v.navStatus] === 'Moored' ? 'Moored' : 'Stationary';
 }
@@ -320,6 +327,7 @@ function renderVessels() {
     element.innerHTML = shape({ cat, moving, rotation, size });
     element.title = titleCase(v.name) || `MMSI ${v.mmsi}`;
     element.style.zIndex = cat === 'tier' ? 3 : moving ? 2 : 1;
+    element.classList.toggle('stale', isStale(v));
     m.getPopup().setHTML(popup(v, cat));
   }
 
@@ -350,7 +358,7 @@ function renderVesselList(tierNames) {
     .map((v) => {
       const cat = vesselCategory(v, tierNames);
       const moving = v.sog >= 0.5;
-      return `<li><button type="button" data-mmsi="${v.mmsi}">
+      return `<li><button type="button" data-mmsi="${v.mmsi}"${isStale(v) ? ' class="stale"' : ''}>
         ${shape({ cat, moving, rotation: v.cog ?? v.heading ?? 0, size: 16 })}
         <span><span class="name">${esc(titleCase(v.name) || 'Unnamed vessel')}</span>
           <span class="kind">${esc(CATEGORIES[category(v.type)])}</span></span>
@@ -364,18 +372,32 @@ function renderVesselList(tierNames) {
 function renderFeedStatus() {
   const { status, vessels } = feed;
   const p = el('feed');
+  const n = vessels.length;
+  const boats = `${n} ${n === 1 ? 'boat' : 'boats'}`;
+  const stale = vessels.filter(isStale).length;
+  const newest = Math.max(...vessels.map((v) => v.lastSeen));
+
   if (status.state === 'disabled') {
-    p.textContent =
-      'Live positions are off. Add a free aisstream.io API key as AISSTREAM_API_KEY in .env, then restart the server.';
-  } else if (status.error && !vessels.length) {
-    p.textContent = `The AIS feed reported a problem: ${status.error}`;
-  } else if (!vessels.length) {
+    p.innerHTML =
+      'Live positions are off because the site has no aisstream.io API key. The <a href="https://github.com/adamjhc/greenwich-reach-watch#readme" target="_blank" rel="noopener">README</a> explains how to add one.';
+  } else if (status.state !== 'connected' && status.error) {
+    p.textContent = `Can't reach the live feed (${status.error}). Retrying every minute${
+      n ? '; boats shown are where they were last heard' : ''
+    }.`;
+  } else if (status.state !== 'connected') {
+    p.textContent = n
+      ? `Reconnecting to the live feed. Until boats report in, the map shows where they were ${ago(newest)}.`
+      : 'Connecting to the live feed. Moving boats appear within seconds; moored ones report every few minutes.';
+  } else if (!n) {
     p.textContent =
       'Listening for boats. Moving boats report every few seconds; moored ones every few minutes, so the map fills in gradually.';
+  } else if (stale) {
+    p.textContent = `${boats} on the map. ${stale === n ? 'None have' : `${stale} haven't`} reported recently and ${
+      stale === 1 ? 'is' : 'are'
+    } shown faded until they do.`;
   } else {
-    const n = vessels.length;
     const heard = status.lastMessageAt ? `, last report ${ago(status.lastMessageAt)}` : '';
-    p.textContent = `${n} ${n === 1 ? 'boat' : 'boats'} heard in the last 30 minutes${heard}.`;
+    p.textContent = `${boats} heard in the last 30 minutes${heard}.`;
   }
 }
 
@@ -409,9 +431,10 @@ stream.addEventListener('vessels', (e) => {
   renderVessels();
 });
 
-// Keep countdowns and "heard x ago" text honest between server pushes.
+// Keep countdowns, "heard x ago" text and faded boats honest between
+// server pushes.
 setInterval(() => {
   renderTier();
-  renderFeedStatus();
+  renderVessels();
   renderUpdated();
 }, 30000);

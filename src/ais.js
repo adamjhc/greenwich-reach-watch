@@ -24,6 +24,16 @@ export function createAis({ apiKey, bbox, onChange }) {
 
   if (!apiKey) status.error = 'AISSTREAM_API_KEY is not set';
 
+  // Status changes are pushed to viewers like vessel updates, so the page
+  // can say when the feed is connecting or catching up.
+  function setStatus(changes) {
+    for (const [key, value] of Object.entries(changes)) {
+      if (status[key] === value) continue;
+      status[key] = value;
+      onChange?.();
+    }
+  }
+
   function vessel(mmsi) {
     if (!vessels.has(mmsi)) vessels.set(mmsi, { mmsi });
     return vessels.get(mmsi);
@@ -93,7 +103,7 @@ export function createAis({ apiKey, bbox, onChange }) {
   }
 
   async function connect() {
-    status.state = 'connecting';
+    setStatus({ state: 'connecting' });
     let received = false;
     try {
       // Workers open outbound WebSockets with an Upgrade fetch.
@@ -102,8 +112,7 @@ export function createAis({ apiKey, bbox, onChange }) {
       socket = res.webSocket;
       socket.accept();
     } catch (err) {
-      status.state = 'reconnecting';
-      status.error = err.message;
+      setStatus({ state: 'reconnecting', error: err.message });
       return;
     }
 
@@ -115,7 +124,7 @@ export function createAis({ apiKey, bbox, onChange }) {
         FilterMessageTypes: MESSAGE_TYPES,
       }),
     );
-    status.state = 'connected';
+    setStatus({ state: 'connected' });
     lastActivity = Date.now();
 
     ws.addEventListener('message', async (event) => {
@@ -133,12 +142,12 @@ export function createAis({ apiKey, bbox, onChange }) {
         return;
       }
       received = true;
-      status.error = null;
       status.lastMessageAt = lastActivity = Date.now();
       if (msg.error) {
-        status.error = msg.error;
+        setStatus({ error: msg.error });
         return;
       }
+      setStatus({ error: null });
       handle(msg);
     });
 
@@ -147,13 +156,15 @@ export function createAis({ apiKey, bbox, onChange }) {
       socket = null;
       // aisstream drops the socket without a reason when the key is bad.
       if (!received) {
-        status.error = `aisstream closed the connection (code ${event.code}) before sending data. Check AISSTREAM_API_KEY.`;
+        setStatus({
+          error: `aisstream closed the connection (code ${event.code}) before sending data. Check AISSTREAM_API_KEY.`,
+        });
       }
-      if (status.state !== 'stopped') status.state = 'reconnecting';
+      if (status.state !== 'stopped') setStatus({ state: 'reconnecting' });
     });
 
     ws.addEventListener('error', () => {
-      status.error = status.error ?? 'aisstream WebSocket error';
+      if (!status.error) setStatus({ error: 'aisstream WebSocket error' });
     });
   }
 
@@ -181,7 +192,7 @@ export function createAis({ apiKey, bbox, onChange }) {
 
     stop() {
       if (!apiKey) return;
-      status.state = 'stopped';
+      setStatus({ state: 'stopped' });
       const ws = socket;
       socket = null;
       ws?.close(1000, 'No viewers');

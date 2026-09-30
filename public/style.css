@@ -263,6 +263,16 @@ h2 {
   align-self: center;
 }
 
+/* Not heard from recently: the position shown is old. */
+.vessels button.stale .name,
+.vessels button.stale .swatch {
+  opacity: 0.5;
+}
+
+.boat.stale {
+  opacity: 0.4;
+}
+
 .sources {
   font-size: 0.875rem;
   color: var(--muted);
