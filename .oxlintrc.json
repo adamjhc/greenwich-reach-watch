@@ -1,0 +1,77 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["eslint", "typescript", "unicorn", "oxc", "import", "promise", "jsdoc", "node"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "pedantic": "error",
+    "perf": "error",
+    "style": "error",
+    "restriction": "error",
+    "nursery": "error"
+  },
+  "options": {
+    "typeAware": true,
+    "denyWarnings": true,
+    "reportUnusedDisableDirectives": "error"
+  },
+  "ignorePatterns": ["dist", "worker-configuration.d.ts"],
+  "rules": {
+    "eslint/func-style": ["error", "declaration"],
+    "eslint/one-var": ["error", "never"],
+    "eslint/capitalized-comments": ["error", "always", { "ignoreConsecutiveComments": true }],
+    "eslint/sort-imports": ["error", { "ignoreDeclarationSort": true }],
+    "eslint/no-console": ["error", { "allow": ["error"] }],
+    "eslint/no-void": ["error", { "allowAsStatement": true }],
+    "eslint/no-duplicate-imports": ["error", { "allowSeparateTypeImports": true }],
+    "typescript/prefer-readonly-parameter-types": [
+      "error",
+      {
+        "ignoreInferredTypes": true,
+        "treatMethodsAsReadonly": true,
+        "allow": [
+          { "from": "lib", "name": ["Event", "Uint8Array"] },
+          { "from": "package", "package": "maplibre-gl", "name": ["LngLatLike"] },
+          {
+            "from": "file",
+            "path": "worker-configuration.d.ts",
+            "name": ["DurableObjectState", "Env", "WebSocket"]
+          }
+        ]
+      }
+    ],
+
+    // Off: rules that contradict another enabled rule, ban ES2015+ syntax this
+    // ES2024 code relies on, or only reorder or rename things arbitrarily.
+    // Numbers here are AIS codes, ship-type ranges and SVG geometry; the
+    // meaningful ones are already named constants.
+    "eslint/no-magic-numbers": "off",
+    // Short names (v, e, d) are conventional in small callbacks.
+    "eslint/id-length": "off",
+    // Key order carries meaning (south, west, north, east; option overrides after spreads).
+    "eslint/sort-keys": "off",
+    // Contradicts unicorn/prefer-ternary.
+    "eslint/no-ternary": "off",
+    // TypeScript already checks this, and the rule misreports global types.
+    "eslint/no-undef": "off",
+    // Comparing with undefined is how optional fields are tested; the typeof alternative is worse.
+    "eslint/no-undefined": "off",
+    // JSON payloads need null (undefined drops the key), and DOM APIs return it.
+    "unicorn/no-null": "off",
+    // These three ban modern syntax for old runtimes; Workers and the browsers targeted support it.
+    "oxc/no-optional-chaining": "off",
+    "oxc/no-async-await": "off",
+    "oxc/no-rest-spread-properties": "off",
+    // Contradicts import/no-default-export, which stays on.
+    "import/no-named-export": "off",
+    // Contradicts import/no-default-export.
+    "import/prefer-default-export": "off"
+  },
+  "overrides": [
+    {
+      // Workers and Vite both require a default export from these files.
+      "files": ["src/server/worker.ts", "vite.config.ts"],
+      "rules": { "import/no-default-export": "off" }
+    }
+  ]
+}

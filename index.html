@@ -4,7 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Greenwich Reach Watch</title>
-    <meta name="description" content="Live boats on the Thames around Greenwich, and what's moored at Greenwich Ship Tier." />
+    <meta
+      name="description"
+      content="Live boats on the Thames around Greenwich, and what's moored at Greenwich Ship Tier."
+    />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -40,18 +43,22 @@
         <footer class="sources">
           <p>
             Tier schedule from the
-            <a href="https://pla.co.uk/ship-movements" target="_blank" rel="noopener">Port of London Authority ship list</a>, checked every
-            5 minutes. Live positions from <a href="https://aisstream.io" target="_blank" rel="noopener">aisstream.io</a>. Times are UK time.
+            <a href="https://pla.co.uk/ship-movements" target="_blank" rel="noopener"
+              >Port of London Authority ship list</a
+            >, checked every 5 minutes. Live positions from
+            <a href="https://aisstream.io" target="_blank" rel="noopener">aisstream.io</a>. Times are UK time.
           </p>
           <p id="updated"></p>
           <p>
-            <a href="https://github.com/adamjhc/greenwich-reach-watch" target="_blank" rel="noopener">Source code on GitHub</a>
+            <a href="https://github.com/adamjhc/greenwich-reach-watch" target="_blank" rel="noopener"
+              >Source code on GitHub</a
+            >
           </p>
         </footer>
       </div>
     </main>
 
     <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
-    <script src="/app.js" type="module"></script>
+    <script src="/src/client/app.ts" type="module"></script>
   </body>
 </html>

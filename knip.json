@@ -1,0 +1,27 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "project": ["src/**/*.ts"],
+  "includeEntryExports": true,
+  "ignoreExportsUsedInFile": false,
+  "treatConfigHintsAsErrors": true,
+  "rules": {
+    "binaries": "error",
+    "catalog": "error",
+    "catalogReferences": "error",
+    "cycles": "error",
+    "dependencies": "error",
+    "devDependencies": "error",
+    "duplicates": "error",
+    "enumMembers": "error",
+    "exports": "error",
+    "files": "error",
+    "namespaceMembers": "error",
+    "nsExports": "error",
+    "nsTypes": "error",
+    "optionalPeerDependencies": "error",
+    "types": "error",
+    "unlisted": "error",
+    "unresolved": "error"
+  },
+  "ignoreDependencies": ["cloudflare"]
+}

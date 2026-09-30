@@ -1,21 +1,27 @@
 // Static files in public/ are served by Workers Static Assets before this
 // runs; only /api/* reaches the Worker.
-export { River } from './river.js';
 
-export default {
-  async fetch(request, env) {
+const handler = {
+  async fetch(request, env): Promise<Response> {
     const { pathname } = new URL(request.url);
     const river = env.RIVER.getByName('greenwich-reach');
 
     switch (pathname) {
-      case '/api/stream':
+      case '/api/stream': {
         return river.stream();
-      case '/api/tier':
+      }
+      case '/api/tier': {
         return Response.json(await river.tierSnapshot());
-      case '/api/vessels':
+      }
+      case '/api/vessels': {
         return Response.json(await river.vesselSnapshot());
-      default:
+      }
+      default: {
         return new Response('Not found', { status: 404 });
+      }
     }
   },
-};
+} satisfies ExportedHandler<Env>;
+
+export { River } from './river.ts';
+export default handler;

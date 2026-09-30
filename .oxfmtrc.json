@@ -1,0 +1,8 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 120,
+  "singleQuote": true,
+  "sortImports": true,
+  "sortPackageJson": true,
+  "ignorePatterns": ["worker-configuration.d.ts", "dist", "package-lock.json"]
+}

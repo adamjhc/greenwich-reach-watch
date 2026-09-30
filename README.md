@@ -5,13 +5,14 @@ what's moored at **Greenwich Ship Tier** and when it next moves.
 
 ## Run it locally
 
-Needs Node 22 or newer. The app runs on Cloudflare Workers, and Wrangler
-simulates Workers on your machine.
+Needs Node 22 or newer. The app runs on Cloudflare Workers. Vite, with the
+Cloudflare Vite plugin, runs the Worker in the real Workers runtime on your
+machine and serves the page with hot reload.
 
 ```sh
 npm install
 cp .env.example .env   # then paste your aisstream.io key into it
-npm run dev            # http://localhost:8787
+npm run dev            # http://localhost:5173
 ```
 
 Without an API key the site still runs. It shows the Greenwich Tier status
@@ -39,11 +40,11 @@ npm run deploy
 
 All of these are free. I checked each one before choosing it.
 
-| Need | Source | Cost / access | Notes |
-| --- | --- | --- | --- |
-| Greenwich Tier status and schedule | [PLA ship list](https://shiplist.pla.co.uk/shiplist.cfm), the data behind [pla.co.uk/ship-movements](https://pla.co.uk/ship-movements) | Free, no key | No API. These are plain HTML tables, and the server scrapes them every 5 minutes. They send no CORS headers, so a browser can't fetch them directly. |
-| Live boat positions | [aisstream.io](https://aisstream.io) WebSocket | Free, needs a key | Filtered to a bounding box. Browser connections aren't allowed, so the server holds the socket and relays data over Server-Sent Events. No SLA. |
-| Map | [OpenFreeMap](https://openfreemap.org) vector tiles with MapLibre GL | Free, no key | CARTO basemaps now need an API key, so they aren't used. |
+| Need                               | Source                                                                                                                                 | Cost / access     | Notes                                                                                                                                                |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Greenwich Tier status and schedule | [PLA ship list](https://shiplist.pla.co.uk/shiplist.cfm), the data behind [pla.co.uk/ship-movements](https://pla.co.uk/ship-movements) | Free, no key      | No API. These are plain HTML tables, and the server scrapes them every 5 minutes. They send no CORS headers, so a browser can't fetch them directly. |
+| Live boat positions                | [aisstream.io](https://aisstream.io) WebSocket                                                                                         | Free, needs a key | Filtered to a bounding box. Browser connections aren't allowed, so the server holds the socket and relays data over Server-Sent Events. No SLA.      |
+| Map                                | [OpenFreeMap](https://openfreemap.org) vector tiles with MapLibre GL                                                                   | Free, no key      | CARTO basemaps now need an API key, so they aren't used.                                                                                             |
 
 Rejected sources:
 
@@ -53,13 +54,13 @@ Rejected sources:
 
 ### PLA ship list pages
 
-| `flag=` | List | Used for |
-| --- | --- | --- |
-| 4 | In port | What's moored at `GREENWICH TIER` now, and when it berthed |
-| 5 | Expected arrivals | Arrivals where *To* is the tier |
-| 6 | Expected departures | Departures where *From* is the tier |
-| 7 | Expected movements | Shifts to or from the tier within the port |
-| 2 / 3 | Arrivals / departures in the last 24 h | Not used |
+| `flag=` | List                                   | Used for                                                   |
+| ------- | -------------------------------------- | ---------------------------------------------------------- |
+| 4       | In port                                | What's moored at `GREENWICH TIER` now, and when it berthed |
+| 5       | Expected arrivals                      | Arrivals where _To_ is the tier                            |
+| 6       | Expected departures                    | Departures where _From_ is the tier                        |
+| 7       | Expected movements                     | Shifts to or from the tier within the port                 |
+| 2 / 3   | Arrivals / departures in the last 24 h | Not used                                                   |
 
 The forecast lists give the date as `dd/mm` with no year. The server infers
 the year and treats times as UK local time (`Europe/London`).
@@ -72,29 +73,50 @@ aisstream.io ──WebSocket (only while someone is viewing)──┐
 PLA ship list ──HTTP, at most every 5 min─────────────────┘
 ```
 
-- `src/worker.js` is the Worker entry point. Workers Static Assets serves
-  `public/`, and the Worker only handles `/api/stream`, `/api/tier` and
-  `/api/vessels`.
-- `src/river.js` holds the `River` Durable Object. A single instance holds
-  the aisstream connection, the vessel state and the cached Tier status, and
-  relays updates to every open page. It connects to aisstream when the first
-  viewer arrives and disconnects 10 minutes after the last one leaves, so it
-  uses little of the free plan's Durable Object allowance. That allowance is
-  shared with any other Durable Objects on the account. The last known
-  vessels and Tier status are saved to the object's storage, so a returning
-  viewer sees boats straight away.
-- `src/ais.js` is the aisstream client and vessel tracking. It drops vessels
-  not heard from in 30 minutes.
-- `src/pla.js` scrapes and parses the PLA lists and builds the Greenwich Tier
-  status.
-- `public/` is the front end, with no build step.
+Everything is TypeScript. `npm run build` uses Vite to build the Worker and
+the page into `dist/`, and `npm run deploy` builds before deploying.
+`npm run preview` serves that build locally in the Workers runtime.
+
+- `src/server/worker.ts` is the Worker entry point. Workers Static Assets
+  serves the page (`index.html`, the bundled `src/client/` code and the
+  files in `public/`), and the Worker only handles `/api/stream`, `/api/tier`
+  and `/api/vessels`.
+- `src/server/river.ts` holds the `River` Durable Object. A single instance
+  holds the aisstream connection, the vessel state and the cached Tier
+  status, and relays updates to every open page. It connects to aisstream
+  when the first viewer arrives and disconnects 10 minutes after the last one
+  leaves, so it uses little of the free plan's Durable Object allowance. That
+  allowance is shared with any other Durable Objects on the account. The last
+  known vessels and Tier status are saved to the object's storage, so a
+  returning viewer sees boats straight away.
+- `src/server/ais.ts` is the aisstream client and vessel tracking. It drops
+  vessels not heard from in 30 minutes. `src/server/aisstream.ts` parses
+  aisstream's messages.
+- `src/server/pla.ts` scrapes and parses the PLA lists and builds the
+  Greenwich Tier status.
+- `src/client/` is the front end. `app.ts` is the entry point.
+- `src/shared/types.ts` holds the payload types both sides agree on. Import
+  it as `#shared/types.ts`.
+- `worker-configuration.d.ts` is generated by `npm run types` from
+  `wrangler.jsonc`. Rerun it after changing bindings or vars.
+
+## Checks
+
+`npm run check` runs all of these. Each fails on any finding.
+
+| Script                 | Tool                          | Checks                                                                                        |
+| ---------------------- | ----------------------------- | --------------------------------------------------------------------------------------------- |
+| `npm run typecheck`    | TypeScript (`tsc -b`)         | Strict mode plus every extra strictness flag. The generated Worker types are up to date.      |
+| `npm run lint`         | oxlint, with type-aware rules | Every rule category, including nursery, in `.oxlintrc.json`. Disabled rules are listed there. |
+| `npm run format:check` | oxfmt                         | Formatting and import order. `npm run format` fixes it.                                       |
+| `npm run knip`         | knip                          | Unused files, exports, types and dependencies.                                                |
 
 ## Configuration
 
-| Setting | Where | Meaning |
-| --- | --- | --- |
-| `AISSTREAM_API_KEY` | `.env` locally, `wrangler secret put` in production | Required for live positions |
-| `BBOX` | `vars` in `wrangler.jsonc` | Area to watch: `south,west,north,east`. The default `51.468,-0.060,51.512,0.020` covers the river around Greenwich, out to the O2. |
+| Setting             | Where                                               | Meaning                                                                                                                            |
+| ------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `AISSTREAM_API_KEY` | `.env` locally, `wrangler secret put` in production | Required for live positions                                                                                                        |
+| `BBOX`              | `vars` in `wrangler.jsonc`                          | Area to watch: `south,west,north,east`. The default `51.468,-0.060,51.512,0.020` covers the river around Greenwich, out to the O2. |
 
 ## Caveats
 
