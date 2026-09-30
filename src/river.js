@@ -15,7 +15,7 @@ const frame = (event, data) => encoder.encode(`event: ${event}\ndata: ${JSON.str
 const PING = encoder.encode(': ping\n\n');
 
 function parseBbox(value) {
-  // south,west,north,east — Rotherhithe/Surrey Docks round to the O2.
+  // south,west,north,east — the river around Greenwich, out to the O2.
   const [south, west, north, east] = (value || '51.468,-0.060,51.512,0.020').split(',').map(Number);
   return { south, west, north, east };
 }

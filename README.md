@@ -1,6 +1,6 @@
 # Greenwich Reach Watch
 
-A live map of boats on the Thames around Deptford (SE8) and Greenwich, plus
+A live map of boats on the Thames around Greenwich, plus
 what's moored at **Greenwich Ship Tier** and when it next moves.
 
 ## Run it locally
@@ -94,7 +94,7 @@ PLA ship list ──HTTP, at most every 5 min───────────�
 | Setting | Where | Meaning |
 | --- | --- | --- |
 | `AISSTREAM_API_KEY` | `.env` locally, `wrangler secret put` in production | Required for live positions |
-| `BBOX` | `vars` in `wrangler.jsonc` | Area to watch: `south,west,north,east`. The default `51.468,-0.060,51.512,0.020` covers Rotherhithe to the O2. |
+| `BBOX` | `vars` in `wrangler.jsonc` | Area to watch: `south,west,north,east`. The default `51.468,-0.060,51.512,0.020` covers the river around Greenwich, out to the O2. |
 
 ## Caveats
 
