@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Greenwich Reach Watch</title>
+    <meta name="description" content="Live boats on the Thames around Greenwich and Deptford, and what's moored at Greenwich Ship Tier." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,500&family=Public+Sans:wght@400;600&display=swap"
+    />
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <section class="tier" aria-labelledby="tier-title" aria-live="polite">
+        <p class="site">Greenwich Reach Watch</p>
+        <h1 id="tier-title" class="place">Greenwich Ship Tier</h1>
+        <div id="tier-body"><p class="quiet">Checking the Port of London ship list…</p></div>
+      </section>
+
+      <div id="map" class="map" role="region" aria-label="Map of boats on the Thames near Greenwich"></div>
+
+      <div class="rest">
+        <section aria-labelledby="schedule-title">
+          <h2 id="schedule-title">Tier schedule</h2>
+          <ol id="schedule" class="schedule"></ol>
+        </section>
+
+        <section aria-labelledby="river-title">
+          <h2 id="river-title">On the river now</h2>
+          <p id="feed" class="quiet"></p>
+          <ul id="vessels" class="vessels"></ul>
+        </section>
+
+        <footer class="sources">
+          <p>
+            Tier schedule from the
+            <a href="https://pla.co.uk/ship-movements" target="_blank" rel="noopener">Port of London Authority ship list</a>, checked every
+            5 minutes. Live positions from <a href="https://aisstream.io" target="_blank" rel="noopener">aisstream.io</a>. Times are UK time.
+          </p>
+          <p id="updated"></p>
+        </footer>
+      </div>
+    </main>
+
+    <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

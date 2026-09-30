@@ -1,0 +1,14 @@
+{
+  "name": "greenwich-reach-watch",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Live boats on the Thames around Greenwich/SE8 and the Greenwich Ship Tier schedule",
+  "type": "module",
+  "engines": {
+    "node": ">=22.9"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js",
+    "dev": "node --watch --env-file-if-exists=.env server.js"
+  }
+}

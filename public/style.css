@@ -1,0 +1,389 @@
+:root {
+  --paper: #e6ece9;
+  --ink: #16282c;
+  --river: #35565c;
+  --muted: #56686a;
+  --rule: #c3cfcb;
+  --signal: #f4b400;
+  --signal-ink: #16282c;
+
+  --cat-passenger: #1f5fa8;
+  --cat-cargo: #b0501a;
+  --cat-work: #2c7a4b;
+  --cat-leisure: #7a4fa0;
+  --cat-other: #6b7a80;
+
+  --serif: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+  --sans: 'Public Sans', system-ui, sans-serif;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0f1e21;
+    --ink: #e2ebe7;
+    --river: #8fb3b5;
+    --muted: #93a5a5;
+    --rule: #2a3f43;
+
+    --cat-passenger: #6aa5ee;
+    --cat-cargo: #e48a52;
+    --cat-work: #5cc28a;
+    --cat-leisure: #b690dc;
+    --cat-other: #9aa8ad;
+
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 1rem/1.5 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-underline-offset: 0.2em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+
+h2 {
+  margin: 0 0 0.75rem;
+  font: 600 1rem/1.3 var(--sans);
+}
+
+.quiet {
+  color: var(--muted);
+}
+
+/* Layout: tier pinned top-left, schedule + list scroll beneath, map on the right. */
+.layout {
+  display: grid;
+  height: 100%;
+  grid-template-columns: minmax(340px, 30rem) 1fr;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    'tier map'
+    'rest map';
+}
+
+.tier {
+  grid-area: tier;
+  padding: 1.5rem 1.75rem 1.75rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.map {
+  grid-area: map;
+  min-height: 60vh;
+  background: var(--paper);
+}
+
+.rest {
+  grid-area: rest;
+  overflow-y: auto;
+  padding: 1.5rem 1.75rem 2rem;
+  display: grid;
+  gap: 2rem;
+  align-content: start;
+}
+
+@media (max-width: 800px) {
+  .layout {
+    height: auto;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    grid-template-areas: 'tier' 'map' 'rest';
+  }
+  .tier,
+  .rest {
+    padding-inline: 1rem;
+  }
+  .rest {
+    overflow: visible;
+  }
+}
+
+/* Tier: the one loud thing on the page. */
+.site {
+  margin: 0 0 1.25rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--river);
+}
+
+.place {
+  margin: 0;
+  font: italic 400 1.25rem/1.2 var(--serif);
+  color: var(--river);
+}
+
+.state {
+  margin: 1rem 0 0.25rem;
+  color: var(--muted);
+}
+
+.ship {
+  margin: 0;
+  font: italic 500 clamp(2.5rem, 6vw, 3.75rem) / 1 var(--serif);
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+/* Same yellow as the ship's marker on the map, so the two read as one. */
+.ship-mark {
+  background: linear-gradient(transparent 62%, var(--signal) 62%, var(--signal) 90%, transparent 90%);
+  padding-inline: 0.05em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.facts {
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+}
+
+.next {
+  margin-top: 1.5rem;
+}
+
+.next-when {
+  margin: 0;
+  font: 600 1.625rem/1.2 var(--sans);
+  font-variant-numeric: tabular-nums;
+}
+
+.next-what {
+  margin: 0.25rem 0 0;
+}
+
+.next-what strong {
+  font-weight: 600;
+}
+
+.overdue {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.error {
+  margin: 1rem 0 0;
+  color: var(--cat-cargo);
+}
+
+/* Schedule: a real sequence, so a timeline. */
+.schedule {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.schedule li {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr;
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--rule);
+}
+
+.schedule li.past {
+  color: var(--muted);
+}
+
+.schedule time {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.name {
+  font: italic 500 1.125rem/1.3 var(--serif);
+}
+
+/* Vessel list */
+.vessels {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.vessels button {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 1.25rem 1fr auto;
+  align-items: baseline;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.55rem 0.25rem;
+  border-top: 1px solid var(--rule);
+}
+
+.vessels button:hover {
+  background: color-mix(in srgb, var(--rule) 40%, transparent);
+}
+
+.vessels button:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: -2px;
+}
+
+.vessels .kind {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.vessels .motion {
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  text-align: right;
+}
+
+.swatch {
+  align-self: center;
+}
+
+.sources {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.sources p {
+  margin: 0 0 0.5rem;
+  max-width: 60ch;
+}
+
+/* Map furniture */
+.boat {
+  cursor: pointer;
+  line-height: 0;
+}
+
+.boat svg {
+  display: block;
+  overflow: visible;
+}
+
+.tier-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font: italic 500 0.95rem/1 var(--serif);
+  color: var(--ink);
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow:
+    0 0 3px var(--paper),
+    0 0 3px var(--paper),
+    0 0 3px var(--paper);
+}
+
+.legend {
+  background: var(--paper);
+  color: var(--ink);
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  font: 400 0.8125rem/1.6 var(--sans);
+}
+
+.legend summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.legend[open] summary {
+  margin-bottom: 0.25rem;
+}
+
+.legend div {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.maplibregl-map {
+  font-family: var(--sans);
+}
+
+/* Beats MapLibre's `.maplibregl-ctrl-group button { display: block }`. */
+.maplibregl-ctrl-group .reset-view {
+  display: grid;
+  place-items: center;
+  color: #333;
+}
+
+.reset-view svg {
+  display: block;
+}
+
+/* Boat markers carry z-index 1–3 so the tier ship and moving boats sit on
+   top; popups need to clear all of them. */
+.maplibregl-popup {
+  z-index: 10;
+}
+
+.maplibregl-popup-content {
+  background: var(--paper);
+  color: var(--ink);
+  padding: 0.75rem 1.75rem 0.75rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  border-radius: 4px;
+}
+
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+  border-top-color: var(--paper);
+}
+.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+  border-bottom-color: var(--paper);
+}
+.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: var(--paper);
+}
+.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: var(--paper);
+}
+
+.maplibregl-popup-close-button {
+  color: var(--muted);
+  font-size: 1.25rem;
+  padding: 0 0.4rem;
+}
+
+.maplibregl-popup-content .name {
+  display: block;
+  font-size: 1.25rem;
+  margin-bottom: 0.25rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
