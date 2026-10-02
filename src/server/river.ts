@@ -205,6 +205,7 @@ class River extends DurableObject<Env> {
 
   private vesselsPayload(): VesselsPayload {
     return {
+      sentAt: Date.now(),
       status: this.ais.status,
       viewers: this.clients.size,
       bbox: this.bbox,

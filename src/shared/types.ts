@@ -11,6 +11,8 @@ interface Vessel {
   readonly mmsi: number;
   readonly name: string | null;
   readonly lastSeen: number;
+  // When the position below was reported, by the Worker's clock.
+  readonly fixedAt: number | null;
   readonly lat: number | null;
   readonly lon: number | null;
   // Speed over ground in knots.
@@ -37,6 +39,8 @@ interface AisStatus {
 }
 
 interface VesselsPayload {
+  // The Worker's clock when it sent this, to compare fixedAt against.
+  readonly sentAt: number;
   readonly status: AisStatus;
   readonly viewers: number;
   readonly bbox: Bbox;

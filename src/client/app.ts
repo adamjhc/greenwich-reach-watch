@@ -18,6 +18,8 @@ interface Feed {
 
 let tier: TierPayload | null = null;
 let feed: Feed = { status: { state: 'connecting', error: null, lastMessageAt: null }, vessels: [] };
+// The browser's clock minus the Worker's, as of the last vessels update.
+let clockOffset = 0;
 
 function tierVesselNames(): Set<string> {
   if (!tier) {
@@ -72,7 +74,7 @@ function renderFeedStatus(): void {
 
 function renderVessels(): void {
   const tierNames = tierVesselNames();
-  renderMarkers(feed.vessels, tierNames);
+  renderMarkers(feed.vessels, tierNames, clockOffset);
   el('vessels').innerHTML = feed.vessels
     .toSorted(byInterest(tierNames))
     .map((v) => listItem(v, tierNames))
@@ -131,6 +133,7 @@ stream.addEventListener('vessels', (event) => {
   const data = eventData(event);
   if (isVesselsPayload(data)) {
     feed = data;
+    clockOffset = Date.now() - data.sentAt;
     renderVessels();
   }
 });

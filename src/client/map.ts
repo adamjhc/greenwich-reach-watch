@@ -6,8 +6,10 @@ import type { PositionedVessel } from '#shared/types.ts';
 
 import { el, narrow, reduceMotion } from './dom.ts';
 import { titleCase } from './format.ts';
+import type { Placement } from './reckon.ts';
+import { inMotion, placement, track, untrack } from './reckon.ts';
 import type { MarkerKind } from './vessels.ts';
-import { isMoving, isStale, legend, popup, rotation, shape, vesselCategory } from './vessels.ts';
+import { isMoving, isStale, legend, popup, shape, vesselCategory } from './vessels.ts';
 
 // MapLibre comes from a <script> tag in index.html rather than the bundle.
 declare const maplibregl: {
@@ -31,6 +33,7 @@ interface View {
 
 const dark = matchMedia('(prefers-color-scheme: dark)');
 const markers = new Map<number, Marker>();
+let frame = 0;
 
 function styleUrl(): string {
   return `https://tiles.openfreemap.org/styles/${dark.matches ? 'dark' : 'positron'}`;
@@ -122,15 +125,16 @@ function setUpMap(): void {
     .addTo(map);
 }
 
-function markerFor(v: PositionedVessel): Marker {
+function markerFor(v: PositionedVessel, placed: Placement): Marker {
   const existing = markers.get(v.mmsi);
   if (existing) {
-    return existing.setLngLat([v.lon, v.lat]);
+    return existing.setLngLat(placed.lngLat);
   }
   const element = document.createElement('div');
   element.className = 'boat';
-  const marker = new maplibregl.Marker({ element })
-    .setLngLat([v.lon, v.lat])
+  // Sub-pixel positions keep slow boats from creeping in one-pixel steps.
+  const marker = new maplibregl.Marker({ element, subpixelPositioning: true })
+    .setLngLat(placed.lngLat)
     .setPopup(new maplibregl.Popup({ offset: 14, maxWidth: '280px' }))
     .addTo(map);
   markers.set(v.mmsi, marker);
@@ -145,30 +149,55 @@ function prominence(kind: MarkerKind, moving: boolean): { readonly size: number;
   return moving ? { size: 20, layer: 2 } : { size: 14, layer: 1 };
 }
 
-function drawVessel(v: PositionedVessel, tierNames: ReadonlySet<string>): void {
+function drawVessel(v: PositionedVessel, tierNames: ReadonlySet<string>, placed: Placement): void {
   const kind = vesselCategory(v, tierNames);
   const moving = isMoving(v);
   const { size, layer } = prominence(kind, moving);
-  const marker = markerFor(v);
+  const marker = markerFor(v, placed);
   const element = marker.getElement();
-  element.innerHTML = shape({ kind, moving, degrees: rotation(v), size });
+  element.innerHTML = shape({ kind, moving, degrees: placed.degrees, size });
   element.title = titleCase(v.name) || `MMSI ${v.mmsi}`;
   element.style.zIndex = String(layer);
   element.classList.toggle('stale', isStale(v));
   marker.getPopup().setHTML(popup(v, kind));
 }
 
-function renderMarkers(vessels: readonly PositionedVessel[], tierNames: ReadonlySet<string>): void {
-  const seen = new Set<number>();
-  for (const v of vessels) {
-    seen.add(v.mmsi);
-    drawVessel(v, tierNames);
-  }
+function removeGone(present: ReadonlySet<number>): void {
   for (const [mmsi, marker] of markers) {
-    if (!seen.has(mmsi)) {
+    if (!present.has(mmsi)) {
       marker.remove();
       markers.delete(mmsi);
+      untrack(mmsi);
     }
+  }
+}
+
+// Moves boats between reports, one animation frame at a time, until none
+// are moving or gliding.
+function animate(): void {
+  const placed = inMotion(Date.now());
+  for (const [mmsi, { lngLat, degrees }] of placed) {
+    const marker = markers.get(mmsi);
+    marker?.setLngLat(lngLat);
+    marker?.getElement().querySelector('path')?.setAttribute('transform', `rotate(${degrees})`);
+  }
+  frame = placed.size > 0 ? requestAnimationFrame(animate) : 0;
+}
+
+// The clock offset is the browser's clock minus the Worker's.
+function renderMarkers(
+  vessels: readonly PositionedVessel[],
+  tierNames: ReadonlySet<string>,
+  clockOffset: number,
+): void {
+  const now = Date.now();
+  for (const v of vessels) {
+    track(v, clockOffset, now);
+    drawVessel(v, tierNames, placement(v.mmsi, now) ?? { lngLat: { lng: v.lon, lat: v.lat }, degrees: 0 });
+  }
+  removeGone(new Set(vessels.map((v) => v.mmsi)));
+  if (frame === 0) {
+    frame = requestAnimationFrame(animate);
   }
 }
 

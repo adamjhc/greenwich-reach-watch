@@ -105,6 +105,7 @@ function blankVessel(mmsi: number): Vessel {
     mmsi,
     name: null,
     lastSeen: 0,
+    fixedAt: null,
     lat: null,
     lon: null,
     sog: null,
@@ -125,6 +126,7 @@ function revive(saved: SavedVessel): Vessel {
     mmsi: saved.mmsi,
     name: saved.name ?? null,
     lastSeen: saved.lastSeen,
+    fixedAt: saved.fixedAt ?? null,
     lat: saved.lat ?? null,
     lon: saved.lon ?? null,
     sog: saved.sog ?? null,
@@ -139,12 +141,13 @@ function revive(saved: SavedVessel): Vessel {
   };
 }
 
-function withPosition(v: Vessel, p: PositionBody): Vessel {
+function withPosition(v: Vessel, p: PositionBody, now: number): Vessel {
   if (p.Valid === false) {
     return v;
   }
   return {
     ...v,
+    fixedAt: now,
     lat: p.Latitude,
     lon: p.Longitude,
     sog: p.Sog,
@@ -205,7 +208,7 @@ function applyMessage(vessels: ReadonlyMap<number, Vessel>, msg: AisMessage, now
   const previous = vessels.get(meta.MMSI) ?? blankVessel(meta.MMSI);
   const heard = { ...previous, name: previous.name ?? clean(meta.ShipName), lastSeen: now };
   const position = bodies.PositionReport ?? bodies.StandardClassBPositionReport ?? bodies.ExtendedClassBPositionReport;
-  const updated = withFacts(position ? withPosition(heard, position) : heard, factsOf(bodies));
+  const updated = withFacts(position ? withPosition(heard, position, now) : heard, factsOf(bodies));
 
   // Static data can arrive before we have a position; keep the vessel
   // around but clients only draw ones with coordinates.
